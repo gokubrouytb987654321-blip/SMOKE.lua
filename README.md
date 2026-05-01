@@ -1,0 +1,2 @@
+# SMOKE.lua
+puff smoke
