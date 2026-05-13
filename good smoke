@@ -1,0 +1,267 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local head = character:WaitForChild("Head")
+local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+
+-- =====================
+-- UI
+-- =====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+-- Bouton PRENDRE
+local btnPrendre = Instance.new("TextButton")
+btnPrendre.Size = UDim2.new(0, 120, 0, 55)
+btnPrendre.Position = UDim2.new(0, 20, 0.6, 0)
+btnPrendre.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnPrendre.Text = "👜 Prendre"
+btnPrendre.TextSize = 18
+btnPrendre.Font = Enum.Font.GothamBold
+btnPrendre.TextColor3 = Color3.new(1,1,1)
+btnPrendre.Parent = screenGui
+Instance.new("UICorner", btnPrendre).CornerRadius = UDim.new(0.3, 0)
+
+-- Bouton FUMER (caché au début)
+local btnFumer = Instance.new("TextButton")
+btnFumer.Size = UDim2.new(0, 120, 0, 55)
+btnFumer.Position = UDim2.new(0, 20, 0.6, 65)
+btnFumer.BackgroundColor3 = Color3.fromRGB(30, 100, 255)
+btnFumer.Text = "💨 Fumer"
+btnFumer.TextSize = 18
+btnFumer.Font = Enum.Font.GothamBold
+btnFumer.TextColor3 = Color3.new(1,1,1)
+btnFumer.Visible = false
+btnFumer.Parent = screenGui
+Instance.new("UICorner", btnFumer).CornerRadius = UDim.new(0.3, 0)
+
+-- Bouton RANGER
+local btnRanger = Instance.new("TextButton")
+btnRanger.Size = UDim2.new(0, 120, 0, 55)
+btnRanger.Position = UDim2.new(0, 20, 0.6, 130)
+btnRanger.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+btnRanger.Text = "🎒 Ranger"
+btnRanger.TextSize = 18
+btnRanger.Font = Enum.Font.GothamBold
+btnRanger.TextColor3 = Color3.new(1,1,1)
+btnRanger.Visible = false
+btnRanger.Parent = screenGui
+Instance.new("UICorner", btnRanger).CornerRadius = UDim.new(0.3, 0)
+
+-- =====================
+-- PUFF
+-- =====================
+local function makePart(parent, size, color, cf, transparency, material)
+	local p = Instance.new("Part")
+	p.Size = size
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.CanCollide = false
+	p.Massless = true
+	p.Anchored = false
+	p.Transparency = transparency or 0
+	p.CFrame = cf
+	p.Parent = parent
+	return p
+end
+
+local function weldTo(a, b)
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = a
+	w.Part1 = b
+	w.Parent = a
+	return w
+end
+
+local vapeModel = Instance.new("Model")
+vapeModel.Name = "Vape"
+vapeModel.Parent = character
+
+-- Poche = bas droite du torso
+local pocheCF = torso.CFrame * CFrame.new(0.35, -0.6, 0.2) * CFrame.Angles(0, 0, math.rad(30))
+
+local body = makePart(vapeModel, Vector3.new(0.35, 1.2, 0.35), Color3.fromRGB(10, 55, 210), pocheCF)
+local labelWhite = makePart(vapeModel, Vector3.new(0.36, 0.5, 0.36), Color3.fromRGB(230, 230, 255), body.CFrame * CFrame.new(0, -0.1, 0))
+local labelNeon = makePart(vapeModel, Vector3.new(0.37, 0.38, 0.37), Color3.fromRGB(160, 30, 200), body.CFrame * CFrame.new(0, -0.1, 0), 0.5, Enum.Material.Neon)
+local bandTop = makePart(vapeModel, Vector3.new(0.36, 0.06, 0.36), Color3.fromRGB(0, 20, 120), body.CFrame * CFrame.new(0, 0.15, 0))
+local bandBot = makePart(vapeModel, Vector3.new(0.36, 0.06, 0.36), Color3.fromRGB(0, 20, 120), body.CFrame * CFrame.new(0, -0.36, 0))
+local cap = makePart(vapeModel, Vector3.new(0.28, 0.25, 0.28), Color3.fromRGB(5, 20, 110), body.CFrame * CFrame.new(0, 0.72, 0))
+local tip = makePart(vapeModel, Vector3.new(0.18, 0.15, 0.18), Color3.fromRGB(180, 220, 255), body.CFrame * CFrame.new(0, 0.92, 0), 0.4, Enum.Material.Glass)
+local base = makePart(vapeModel, Vector3.new(0.32, 0.08, 0.32), Color3.fromRGB(5, 20, 140), body.CFrame * CFrame.new(0, -0.64, 0))
+
+weldTo(body, labelWhite)
+weldTo(body, labelNeon)
+weldTo(body, bandTop)
+weldTo(body, bandBot)
+weldTo(body, cap)
+weldTo(body, tip)
+weldTo(body, base)
+
+vapeModel.PrimaryPart = body
+
+-- Weld poche (torso)
+local pocheWeld = weldTo(torso, body)
+
+-- Weld main (désactivé au début)
+local handWeld = Instance.new("WeldConstraint")
+handWeld.Part0 = hand
+handWeld.Part1 = body
+handWeld.Parent = hand
+handWeld.Enabled = false
+
+local dansPoche = true
+local busy = false
+
+-- =====================
+-- FUMÉE
+-- =====================
+local function bigSmoke()
+	local att = Instance.new("Attachment")
+	att.Position = Vector3.new(0, -0.1, -0.8)
+	att.Parent = head
+
+	local configs = {
+		{rate=700, life={3,7},  spd={4,8}, size=15, spread=20, c1=Color3.fromRGB(220,240,255), c2=Color3.fromRGB(255,255,255)},
+		{rate=400, life={4,9},  spd={2,5}, size=28, spread=35, c1=Color3.fromRGB(180,215,255), c2=Color3.fromRGB(240,248,255)},
+		{rate=250, life={5,11}, spd={1,3}, size=42, spread=50, c1=Color3.fromRGB(100,160,255), c2=Color3.fromRGB(210,230,255)},
+		{rate=120, life={6,13}, spd={1,2}, size=60, spread=65, c1=Color3.fromRGB(60,120,230),  c2=Color3.fromRGB(190,220,255)},
+	}
+
+	local emitters = {}
+	for _, c in ipairs(configs) do
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		e.Rate = c.rate
+		e.Lifetime = NumberRange.new(c.life[1], c.life[2])
+		e.Speed = NumberRange.new(c.spd[1], c.spd[2])
+		e.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.3, c.size * 0.4),
+			NumberSequenceKeypoint.new(1, c.size),
+		})
+		e.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.4, 0.35),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		e.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, c.c1),
+			ColorSequenceKeypoint.new(1, c.c2),
+		})
+		e.SpreadAngle = Vector2.new(c.spread, c.spread)
+		e.RotSpeed = NumberRange.new(-25, 25)
+		e.Rotation = NumberRange.new(0, 360)
+		e.LightEmission = 0.5
+		e.Acceleration = Vector3.new(0, 14, -3)
+		e.Parent = att
+		table.insert(emitters, e)
+	end
+
+	task.delay(3, function()
+		for _, e in ipairs(emitters) do e.Enabled = false end
+		task.wait(13)
+		att:Destroy()
+	end)
+end
+
+-- =====================
+-- BOUTON PRENDRE
+-- =====================
+btnPrendre.MouseButton1Click:Connect(function()
+	if busy or not dansPoche then return end
+	busy = true
+	btnPrendre.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+
+	-- Détache de la poche
+	pocheWeld.Enabled = false
+	body.Anchored = true
+
+	-- Anime vers la main
+	local cibleMain = hand.CFrame * CFrame.new(0, -0.3, -0.2)
+	local tween = TweenService:Create(body, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {CFrame = cibleMain})
+	tween:Play()
+	tween.Completed:Wait()
+
+	-- Attache à la main
+	body.Anchored = false
+	handWeld.Enabled = true
+	dansPoche = false
+
+	-- UI
+	btnPrendre.Visible = false
+	btnFumer.Visible = true
+	btnRanger.Visible = true
+	busy = false
+end)
+
+-- =====================
+-- BOUTON RANGER
+-- =====================
+btnRanger.MouseButton1Click:Connect(function()
+	if busy or dansPoche then return end
+	busy = true
+	btnRanger.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+	-- Détache de la main
+	handWeld.Enabled = false
+	body.Anchored = true
+
+	-- Anime vers la poche
+	local ciblePoche = torso.CFrame * CFrame.new(0.35, -0.6, 0.2) * CFrame.Angles(0, 0, math.rad(30))
+	local tween = TweenService:Create(body, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {CFrame = ciblePoche})
+	tween:Play()
+	tween.Completed:Wait()
+
+	-- Attache au torso
+	body.Anchored = false
+	pocheWeld.Enabled = true
+	dansPoche = true
+
+	-- UI
+	btnPrendre.Visible = true
+	btnPrendre.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	btnFumer.Visible = false
+	btnRanger.Visible = false
+	btnRanger.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	busy = false
+end)
+
+-- =====================
+-- BOUTON FUMER
+-- =====================
+btnFumer.MouseButton1Click:Connect(function()
+	if busy or dansPoche then return end
+	busy = true
+	btnFumer.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+	btnRanger.Visible = false
+
+	humanoidRootPart.Anchored = true
+	local startCF = hand.CFrame * CFrame.new(0, -0.3, -0.2)
+
+	handWeld.Enabled = false
+	body.Anchored = true
+
+	local mouthCF = head.CFrame * CFrame.new(0, -0.15, -0.35) * CFrame.Angles(math.rad(-20), 0, 0)
+	local tweenIn = TweenService:Create(body, TweenInfo.new(0.25), {CFrame = mouthCF})
+	tweenIn:Play()
+	tweenIn.Completed:Wait()
+
+	task.wait(2)
+	bigSmoke()
+
+	local tweenOut = TweenService:Create(body, TweenInfo.new(0.25), {CFrame = startCF})
+	tweenOut:Play()
+	tweenOut.Completed:Wait()
+
+	body.Anchored = false
+	handWeld.Enabled = true
+	humanoidRootPart.Anchored = false
+	btnFumer.BackgroundColor3 = Color3.fromRGB(30, 100, 255)
+	btnRanger.Visible = true
+	busy = false
+end)
